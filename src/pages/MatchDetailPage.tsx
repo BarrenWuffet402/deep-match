@@ -132,7 +132,7 @@ export default function MatchDetailPage() {
     const stored = localStorage.getItem('deepmatch_dimension_scores')
     let userScores: Record<string, number> | undefined
     if (stored) {
-      try { userScores = JSON.parse(stored) } catch {}
+      try { userScores = JSON.parse(stored) } catch { /* malformed */ }
     }
     if (userScores) setUserDimensionScores(userScores)
 

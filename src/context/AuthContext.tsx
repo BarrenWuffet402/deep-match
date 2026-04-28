@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
 export interface AuthUser {
   id: string
@@ -22,18 +22,14 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const STORAGE_KEY = 'deepmatch_session'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (!stored) return null
+    try { return JSON.parse(stored) as AuthUser } catch { localStorage.removeItem(STORAGE_KEY); return null }
+  })
+  const [loading] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin')
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try { setUser(JSON.parse(stored)) } catch { localStorage.removeItem(STORAGE_KEY) }
-    }
-    setLoading(false)
-  }, [])
 
   const openAuthModal = useCallback((mode: 'signin' | 'signup' = 'signin') => {
     setAuthModalMode(mode)
