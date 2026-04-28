@@ -1,52 +1,80 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import ProfileCard from '../components/ProfileCard'
 import type { Profile } from '../components/ProfileCard'
 
 const DIMENSIONS = ['Personality', 'Values', 'Intellect', 'Spirituality', 'Communication',
   'Attachment', 'Lifestyle', 'Humor', 'Ambition', 'Intimacy', 'Finances', 'Location']
 
-const FALLBACK_MATCHES: Profile[] = [
-  { id: '1', emoji: '🌿', name: 'Sofia', age: 29, city: 'Stockholm', job: 'Writer', tags: ['Solitude', 'Philosophy', 'Late nights'], matchScore: 91 },
-  { id: '2', emoji: '🌊', name: 'Marcus', age: 32, city: 'Copenhagen', job: 'Architect', tags: ['Minimalism', 'Nature', 'Honesty'], matchScore: 88 },
-  { id: '3', emoji: '😭', name: 'Leila', age: 27, city: 'Berlin', job: 'Therapist', tags: ['Depth', 'Music', 'Slow living'], matchScore: 85 },
-  { id: '4', emoji: '🌙', name: 'Daniel', age: 34, city: 'Oslo', job: 'Researcher', tags: ['Curiosity', 'Books', 'Vulnerability'], matchScore: 83 },
-  { id: '5', emoji: '🔥', name: 'Anika', age: 31, city: 'Amsterdam', job: 'Designer', tags: ['Creativity', 'Honesty', 'Travel'], matchScore: 79 },
-  { id: '6', emoji: '🌸', name: 'Kai', age: 28, city: 'Helsinki', job: 'Musician', tags: ['Art', 'Emotions', 'Silence'], matchScore: 77 },
-  { id: '7', emoji: '✨', name: 'Vera', age: 33, city: 'Vienna', job: 'Philosopher', tags: ['Depth', 'Ethics', 'Wonder'], matchScore: 75 },
-  { id: '8', emoji: '🌍', name: 'Elias', age: 30, city: 'Zurich', job: 'Engineer', tags: ['Logic', 'Nature', 'Simplicity'], matchScore: 72 },
-]
-
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasScores, setHasScores] = useState(false)
   const [apiSource, setApiSource] = useState<'api' | 'fallback'>('fallback')
 
   useEffect(() => {
     let cancelled = false
+
     const fetchMatches = async () => {
+      // Check for stored dimension scores
+      const stored = localStorage.getItem('deepmatch_dimension_scores')
+      const userDimensionScores = stored ? JSON.parse(stored) : null
+
+      if (userDimensionScores) {
+        setHasScores(true)
+        try {
+          const res = await fetch('http://localhost:4000/api/compute-matches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dimensionScores: userDimensionScores }),
+            signal: AbortSignal.timeout(4000),
+          })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = await res.json()
+          if (!cancelled) {
+            const ranked: Profile[] = (data.matches || []).map((m: Profile & { id: string }) => ({ ...m, id: String(m.id) }))
+            setMatches(ranked)
+            // Cache matches for detail page
+            try { localStorage.setItem("deepmatch_matches", JSON.stringify(ranked)) } catch {}
+            setApiSource('api')
+            setError(null)
+          }
+        } catch {
+          if (!cancelled) {
+            setError('Could not reach the API — showing unranked profiles')
+            setApiSource('fallback')
+            // Try to fetch static profiles
+            await fetchStaticProfiles(cancelled)
+          }
+        } finally {
+          if (!cancelled) setLoading(false)
+        }
+      } else {
+        // No scores — fetch static profiles as preview
+        setHasScores(false)
+        await fetchStaticProfiles(cancelled)
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    const fetchStaticProfiles = async (cancelled: boolean) => {
       try {
         const res = await fetch('http://localhost:4000/api/matches', { signal: AbortSignal.timeout(3000) })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
         if (!cancelled) {
-          const apiProfiles: Profile[] = (data.matches || []).map((m: Profile & { id: number }) => ({ ...m, id: String(m.id) }))
-          const apiIds = new Set(apiProfiles.map((p) => p.id))
-          const supplemental = FALLBACK_MATCHES.filter((p) => !apiIds.has(p.id))
-          setMatches([...apiProfiles, ...supplemental])
+          const profiles: Profile[] = (data.matches || []).map((m: Profile & { id: string }) => ({ ...m, id: String(m.id) }))
+          setMatches(profiles)
           setApiSource('api')
-          setError(null)
         }
       } catch {
         if (!cancelled) {
-          setMatches(FALLBACK_MATCHES)
           setApiSource('fallback')
-          setError('API offline — showing demo matches')
         }
-      } finally {
-        if (!cancelled) setLoading(false)
       }
     }
+
     fetchMatches()
     return () => { cancelled = true }
   }, [])
@@ -65,7 +93,24 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {/* Dimension filters — scrollable on mobile */}
+      {/* Prompt to complete questions if no scores */}
+      {!loading && !hasScores && (
+        <div
+          className="mb-8 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+          style={{ background: 'linear-gradient(135deg, #1e1a10, #2a2010)', border: '1px solid rgba(201,169,110,0.3)' }}
+        >
+          <div className="text-2xl">✦</div>
+          <div className="flex-1">
+            <p className="text-gold font-serif mb-1">Complete your questions to see your real matches</p>
+            <p className="text-subtle text-sm">Answer 7 deep questions and we'll rank these profiles by true compatibility.</p>
+          </div>
+          <Link to="/questions" className="btn-primary text-sm px-5 py-2 whitespace-nowrap flex-shrink-0">
+            Take the questions →
+          </Link>
+        </div>
+      )}
+
+      {/* Dimension filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-8 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         {DIMENSIONS.map((dim) => (
           <button key={dim} className="tag text-xs px-3 py-1 cursor-pointer hover:border-gold hover:text-gold transition-colors whitespace-nowrap flex-shrink-0">
@@ -81,8 +126,11 @@ export default function MatchesPage() {
         </div>
       ) : (
         <>
-          {apiSource === 'api' && (
-            <p className="text-xs text-subtle mb-4">✓ Loaded from API · {matches.length} matches</p>
+          {apiSource === 'api' && hasScores && (
+            <p className="text-xs text-subtle mb-4">✓ Ranked by compatibility · {matches.length} matches</p>
+          )}
+          {apiSource === 'api' && !hasScores && (
+            <p className="text-xs text-subtle mb-4">Showing all profiles — complete questions for ranked results</p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {matches.map((profile) => (

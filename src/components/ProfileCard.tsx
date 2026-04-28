@@ -9,6 +9,11 @@ export interface Profile {
   job: string
   tags: string[]
   matchScore: number
+  topDimensions?: string[]
+  dimensionCompatibility?: Record<string, number>
+  dimensionScores?: Record<string, number>
+  bio?: string
+  values?: string[]
 }
 
 interface ProfileCardProps {
@@ -45,6 +50,11 @@ export default function ProfileCard({ profile }: ProfileCardProps) {
           ))}
         </div>
         <div className="text-xs text-gold mt-3">✦ {profile.matchScore}% deep match</div>
+        {profile.topDimensions && profile.topDimensions.length > 0 && (
+          <div className="text-xs mt-2" style={{ color: '#9b95a3' }}>
+            Strong on: {profile.topDimensions.join(' · ')}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -55,6 +55,7 @@ export default function QuestionFlowPage() {
           const data = await res.json()
           if (data.dimensionScores) {
             localStorage.setItem('deepmatch_dimension_scores', JSON.stringify(data.dimensionScores))
+            if (data.matches) { try { localStorage.setItem('deepmatch_matches', JSON.stringify(data.matches)) } catch {} }
           }
         }
       } catch {

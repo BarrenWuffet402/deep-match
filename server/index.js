@@ -10,8 +10,15 @@ app.use(express.json())
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', 'http://localhost:3000')
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
 })
+
+const ALL_DIMENSIONS = [
+  'Personality', 'Values', 'Intellect', 'Spirituality', 'Communication',
+  'Attachment', 'Lifestyle', 'Humor', 'Ambition', 'Intimacy', 'Finances', 'Location'
+]
 
 const DIMENSION_WEIGHTS = {
   0: {
@@ -58,9 +65,55 @@ const DIMENSION_WEIGHTS = {
   },
 }
 
-const ALL_DIMENSIONS = [
-  'Personality', 'Values', 'Intellect', 'Spirituality', 'Communication',
-  'Attachment', 'Lifestyle', 'Humor', 'Ambition', 'Intimacy', 'Finances', 'Location'
+const PROFILE_POOL = [
+  {
+    id: '1', emoji: '🌿', name: 'Sofia', age: 29, city: 'Stockholm', job: 'Writer',
+    bio: 'I write about the quiet spaces between words. Looking for someone who appreciates silence as much as conversation.',
+    tags: ['Solitude', 'Philosophy', 'Late nights'], values: ['Authenticity', 'Deep conversations', 'Solitude'],
+    dimensionScores: { Personality: 88, Values: 94, Intellect: 86, Spirituality: 84, Communication: 82, Attachment: 78, Lifestyle: 80, Humor: 66, Ambition: 72, Intimacy: 90, Finances: 68, Location: 88 },
+  },
+  {
+    id: '2', emoji: '🌊', name: 'Marcus', age: 32, city: 'Copenhagen', job: 'Architect',
+    bio: 'I design spaces that breathe. I believe in doing fewer things, better.',
+    tags: ['Minimalism', 'Nature', 'Honesty'], values: ['Minimalism', 'Nature', 'Honesty'],
+    dimensionScores: { Personality: 78, Values: 86, Intellect: 88, Spirituality: 54, Communication: 80, Attachment: 72, Lifestyle: 92, Humor: 70, Ambition: 88, Intimacy: 74, Finances: 90, Location: 82 },
+  },
+  {
+    id: '3', emoji: '🌺', name: 'Leila', age: 27, city: 'Berlin', job: 'Therapist',
+    bio: 'I hold space for others all day. At night I need someone who can hold space for me.',
+    tags: ['Depth', 'Music', 'Slow living'], values: ['Vulnerability', 'Depth', 'Growth'],
+    dimensionScores: { Personality: 84, Values: 84, Intellect: 78, Spirituality: 76, Communication: 96, Attachment: 92, Lifestyle: 72, Humor: 80, Ambition: 64, Intimacy: 94, Finances: 60, Location: 76 },
+  },
+  {
+    id: '4', emoji: '🌙', name: 'Daniel', age: 34, city: 'Oslo', job: 'Researcher',
+    bio: "I study how humans learn. I'm still learning how to love.",
+    tags: ['Curiosity', 'Books', 'Vulnerability'], values: ['Intellect', 'Vulnerability', 'Honesty'],
+    dimensionScores: { Personality: 68, Values: 80, Intellect: 96, Spirituality: 60, Communication: 76, Attachment: 68, Lifestyle: 68, Humor: 84, Ambition: 92, Intimacy: 72, Finances: 78, Location: 80 },
+  },
+  {
+    id: '5', emoji: '🔥', name: 'Anika', age: 31, city: 'Amsterdam', job: 'Designer',
+    bio: 'Color, texture, movement — I see the world in layers. I want a partner who sees it differently.',
+    tags: ['Creativity', 'Honesty', 'Travel'], values: ['Creativity', 'Adventure', 'Authenticity'],
+    dimensionScores: { Personality: 86, Values: 72, Intellect: 70, Spirituality: 56, Communication: 88, Attachment: 68, Lifestyle: 90, Humor: 92, Ambition: 84, Intimacy: 72, Finances: 64, Location: 66 },
+  },
+  {
+    id: '6', emoji: '🌸', name: 'Kai', age: 28, city: 'Helsinki', job: 'Musician',
+    bio: 'Music is how I process the world. Looking for someone who feels before they think.',
+    tags: ['Art', 'Emotions', 'Silence'], values: ['Creativity', 'Spirituality', 'Depth'],
+    dimensionScores: { Personality: 74, Values: 70, Intellect: 64, Spirituality: 92, Communication: 68, Attachment: 86, Lifestyle: 70, Humor: 76, Ambition: 58, Intimacy: 88, Finances: 56, Location: 66 },
+  },
+  {
+    id: '7', emoji: '✨', name: 'Vera', age: 33, city: 'Vienna', job: 'Philosopher',
+    bio: "I ask questions for a living. Searching for someone who enjoys not having all the answers.",
+    tags: ['Depth', 'Ethics', 'Wonder'], values: ['Intellect', 'Ethics', 'Wonder'],
+    dimensionScores: { Personality: 72, Values: 78, Intellect: 94, Spirituality: 82, Communication: 76, Attachment: 66, Lifestyle: 64, Humor: 72, Ambition: 76, Intimacy: 70, Finances: 70, Location: 66 },
+  },
+  {
+    id: '8', emoji: '🌍', name: 'Elias', age: 30, city: 'Zurich', job: 'Engineer',
+    bio: 'I build things that last. Hoping to build something real.',
+    tags: ['Logic', 'Nature', 'Simplicity'], values: ['Simplicity', 'Nature', 'Stability'],
+    dimensionScores: { Personality: 64, Values: 72, Intellect: 86, Spirituality: 48, Communication: 66, Attachment: 70, Lifestyle: 80, Humor: 66, Ambition: 88, Intimacy: 62, Finances: 94, Location: 72 },
+  },
 ]
 
 function computeDimensionScores(answers) {
@@ -91,18 +144,67 @@ function computeDimensionScores(answers) {
   return scores
 }
 
+function computeDimensionCompatibility(userScores, profileScores) {
+  const compat = {}
+  for (const dim of ALL_DIMENSIONS) {
+    const u = userScores[dim] ?? 65
+    const p = profileScores[dim] ?? 65
+    compat[dim] = Math.round(Math.max(0, 100 - Math.abs(u - p) * 1.4))
+  }
+  return compat
+}
+
+function cosineSimilarity(userScores, profileScores) {
+  let dot = 0, magA = 0, magB = 0
+  for (const dim of ALL_DIMENSIONS) {
+    const a = userScores[dim] ?? 65
+    const b = profileScores[dim] ?? 65
+    dot += a * b
+    magA += a * a
+    magB += b * b
+  }
+  if (magA === 0 || magB === 0) return 0
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB))
+}
+
+function getTopSharedDimensions(dimCompatibility, n = 3) {
+  return Object.entries(dimCompatibility)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, n)
+    .map(([dim]) => dim)
+}
+
+function computeMatches(userScores) {
+  return PROFILE_POOL
+    .map((profile) => {
+      const dimCompat = computeDimensionCompatibility(userScores, profile.dimensionScores)
+      const cosine = cosineSimilarity(userScores, profile.dimensionScores)
+      const avgCompat = Object.values(dimCompat).reduce((s, v) => s + v, 0) / ALL_DIMENSIONS.length
+      const matchScore = Math.round(cosine * 60 + avgCompat * 0.4)
+      const topDimensions = getTopSharedDimensions(dimCompat, 3)
+      return {
+        ...profile,
+        matchScore,
+        dimensionCompatibility: dimCompat,
+        topDimensions,
+      }
+    })
+    .sort((a, b) => b.matchScore - a.matchScore)
+}
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'DeepMatch API', version: '0.2.0', timestamp: new Date().toISOString() })
+  res.json({ status: 'ok', service: 'DeepMatch API', version: '0.3.0', timestamp: new Date().toISOString() })
 })
 
 app.get('/api/matches', (req, res) => {
-  res.json({
-    matches: [
-      { id: 1, name: 'Sofia', age: 29, city: 'Stockholm', job: 'Writer', emoji: '🌿', matchScore: 91, tags: ['Solitude', 'Philosophy', 'Late nights'] },
-      { id: 2, name: 'Marcus', age: 32, city: 'Copenhagen', job: 'Architect', emoji: '🌊', matchScore: 88, tags: ['Minimalism', 'Nature', 'Honesty'] },
-      { id: 3, name: 'Leila', age: 27, city: 'Berlin', job: 'Therapist', emoji: '😭', matchScore: 85, tags: ['Depth', 'Music', 'Slow living'] },
-    ]
-  })
+  const stored = req.query.scores
+  if (stored) {
+    try {
+      const userScores = JSON.parse(decodeURIComponent(stored))
+      return res.json({ matches: computeMatches(userScores), source: 'computed' })
+    } catch {}
+  }
+  res.json({ matches: PROFILE_POOL, note: 'Static profiles — submit answers for ranked matches' })
 })
 
 app.post('/api/answers', (req, res) => {
@@ -111,7 +213,23 @@ app.post('/api/answers', (req, res) => {
     return res.status(400).json({ error: 'answers array required' })
   }
   const dimensionScores = computeDimensionScores(answers)
-  res.json({ success: true, message: 'Profile computed.', dimensionScores, answeredQuestions: answers.length })
+  const matches = computeMatches(dimensionScores)
+  res.json({
+    success: true,
+    message: 'Profile computed.',
+    dimensionScores,
+    answeredQuestions: answers.length,
+    matches,
+  })
+})
+
+app.post('/api/compute-matches', (req, res) => {
+  const { dimensionScores } = req.body
+  if (!dimensionScores || typeof dimensionScores !== 'object') {
+    return res.status(400).json({ error: 'dimensionScores object required' })
+  }
+  const matches = computeMatches(dimensionScores)
+  res.json({ success: true, matches })
 })
 
 app.post('/api/profile', (req, res) => {
