@@ -158,7 +158,7 @@ export default function HowItWorksPage() {
         </h1>
         <p className="text-subtle text-base sm:text-lg leading-relaxed">
           Most apps optimize for engagement. We optimize for connection.
-          Here's what that actually looks like.
+          Here&apos;s what that actually looks like.
         </p>
       </div>
 
